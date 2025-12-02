@@ -1,0 +1,16 @@
+@import url("fonts.css");
+
+html, body {
+  font-size: 1rem;
+  font-family: "Barlow Regular";
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2 {
+  font-family: "Barlow Bold";
+}
+
+h3, h4 {
+  font-family: "Barlow Medium";
+}
