@@ -29,9 +29,9 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 if (empty($_POST) && empty($_FILES)) {
-  goToPageWithMessage("index.php", "The picture you uploaded is too big!", "error");
+  goToPageWithMessage("index.php", "The image you uploaded is too big, and was not added to the website!", "error");
 } else if ($uploadedFile["size"] > 8 * 1024 * 1024) {
-  goToPageWithMessage("index.php", "The picture you uploaded is too big!", "error");
+  goToPageWithMessage("index.php", "The image you uploaded is too big, and was not added to the website!", "error");
 }
 
 $uploadTitle = $_POST["title"];
@@ -51,9 +51,9 @@ if (!isset($uploadName) || empty($uploadName)) {
 if ($uploadedFile["error"] !== 0) {
   switch ($uploadedFile["error"]) {
     case 3:
-      goToPageWithMessage("index.php", "The file was partially uploaded, try again.", "warning");
+      goToPageWithMessage("index.php", "The file was partially uploaded, and thus not added to the website. Please try again (later).", "warning");
     case 4:
-      goToPageWithMessage("index.php", "You must upload an image.", "warning");
+      goToPageWithMessage("index.php", "That's not an image!", "warning");
     case 6:
     case 7:
     case 8:
@@ -67,14 +67,14 @@ if ($uploadedFile["error"] !== 0) {
 $imageHash = hash_file("sha3-224", $uploadedFile["tmp_name"]);
 $exifMimeType = exif_imagetype($uploadedFile["tmp_name"]);
 $imageTypeToExtension = [
-  IMAGETYPE_JPEG => "jpg",
-  IMAGETYPE_PNG => "png",
-  IMAGETYPE_GIF => "gif",
-  IMAGETYPE_WEBP => "webp",
-  IMAGETYPE_AVIF => "avif"
+  IMAGETYPE_JPEG => ".jpg",
+  IMAGETYPE_PNG => ".png",
+  IMAGETYPE_GIF => ".gif",
+  IMAGETYPE_WEBP => ".webp",
+  IMAGETYPE_AVIF => ".avif"
 ];
 $imageExtension = isset($imageTypeToExtension[$exifMimeType]) ? $imageTypeToExtension[$exifMimeType] : "none";
-if ($imageExtension === "none") goToPageWithMessage("index.php", "The uploaded image is not supported currently.", "warning");
+if ($imageExtension === "none") goToPageWithMessage("index.php", "The image you uploaded is currently not supported.", "warning");
 $newImageFile = $imageHash . $imageExtension;
 
 if (!file_exists($uploadsFolder . $newImageFile)) {
@@ -85,16 +85,15 @@ if (!file_exists($uploadsFolder . $newImageFile)) {
 
 try {
   require "config.php";
-  $query = "INSERT INTO `uploads` (`uploader`, `title`, `image_hash`) VALUES (:uploader, :title, :image_hash)";
+  $query = "INSERT INTO `uploads` (`uploader`, `title`, `image`) VALUES (:uploader, :title, :image)";
   $stmt = $conn->prepare($query);
   $stmt->bindValue(":uploader", $uploadName);
   $stmt->bindValue(":title", $uploadTitle);
-  $stmt->bindValue(":image_hash", $imageHash);
-  $stmt->bindValue(":image_original_name", $uploadedFile["name"]);
+  $stmt->bindValue(":image", $newImageFile);
   $stmt->execute();
 } catch (PDOException $error) {
   goToPageWithMessage("index.php", "An error occurred trying to add image to the DB. " . $error->getMessage(), "error");
 }
 
 // Als het goed is, is alles goed gegaan als we hier zijn.
-goToPageWithMessage("index.php", "Added the image to the Database.");
+goToPageWithMessage("index.php", "Successfully added your image to the database.");

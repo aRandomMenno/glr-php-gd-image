@@ -17,7 +17,7 @@
       </div>
     <?php else: ?>
       <div class="alert alert-info" role="alert">
-        No images have been uploaded yet! <a href="upload.php" class="alert-link">Be the first one</a>!
+        No images have been uploaded yet! <a href="index.php" class="alert-link">Be the first one</a>!
       </div>
     <?php endif; ?>
   </div>
