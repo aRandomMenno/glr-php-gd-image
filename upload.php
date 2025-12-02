@@ -1,7 +1,7 @@
 <?php
 
 require_once "tools/goto.php";
-require_once "tools/webp.php";
+require_once "tools/images.php";
 
 session_start();
 
@@ -9,6 +9,20 @@ $uploadsFolder = __DIR__ . "/.uploads/";
 if (!is_dir($uploadsFolder))
   mkdir($uploadsFolder, 0755, true);
 $uploadedFile = $_FILES["file"];
+
+/* 
+var_dump($uploadedFile);
+exit();
+
+array(6) {
+  ["name"]=> string(5) "6.png",
+  ["full_path"]=> string(5) "6.png",
+  ["type"]=> string(9) "image/png",
+  ["tmp_name"]=> string(14) "/tmp/phpstRV5O",
+  ["error"]=> int(0),
+  ["size"]=> int(bytes),
+} 
+*/
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   goToPageWithMessage("index.php", "That's not a POST request!", "error");
@@ -51,65 +65,32 @@ if ($uploadedFile["error"] !== 0) {
 }
 
 $imageHash = hash_file("sha3-224", $uploadedFile["tmp_name"]);
-$imageName = str_replace(" ", "_", $uploadedFile["name"]);
-$imageFilename = basename($imageHash . "-" . $imageName);
-if (strtolower(str_ends_with($imageName, ".jpg"))) $imageFilename = preg_replace('/.jpg$/', '.avif', $imageFilename);
-if (strtolower(str_ends_with($imageName, ".jpeg"))) $imageFilename = preg_replace('/.jpeg$/', '.avif', $imageFilename);
-if (strtolower(str_ends_with($imageName, ".png"))) $imageFilename = preg_replace('/.png$/', '.avif', $imageFilename);
+$exifMimeType = exif_imagetype($uploadedFile["tmp_name"]);
+$imageTypeToExtension = [
+  IMAGETYPE_JPEG => "jpg",
+  IMAGETYPE_PNG => "png",
+  IMAGETYPE_GIF => "gif",
+  IMAGETYPE_WEBP => "webp",
+  IMAGETYPE_AVIF => "avif"
+];
+$imageExtension = isset($imageTypeToExtension[$exifMimeType]) ? $imageTypeToExtension[$exifMimeType] : "none";
+if ($imageExtension === "none") goToPageWithMessage("index.php", "The uploaded image is not supported currently.", "warning");
+$newImageFile = $imageHash . $imageExtension;
 
-if (!file_exists($uploadsFolder . $imageFilename)) {
-  // Bekijken het type foto.
-  $imageType = exif_imagetype($uploadedFile["tmp_name"]);
-  $gdImage = false;
-  // Zorg dat het een GDImage object is. (tenzij het geanimeerd is)
-  switch ($imageType) {
-    case IMAGETYPE_JPEG:
-      $gdImage = imagecreatefromjpeg($uploadedFile["tmp_name"]);
-      break;
-    case IMAGETYPE_PNG:
-      $gdImage = imagecreatefrompng($uploadedFile["tmp_name"]);
-      break;
-    case IMAGETYPE_GIF:
-      // Php heeft geen animation support voor images.
-      $gdImage = "animated";
-      break;
-    case IMAGETYPE_WEBP:
-      // Php heeft geen animation support voor images.
-      if (!isWebpAnimated($uploadedFile["tmp_name"])) {
-        if (strtolower(str_ends_with($imageName, ".webp"))) $imageFilename = preg_replace('/.webp$/', '.avif', $imageFilename);
-        $gdImage = imagecreatefromwebp($uploadedFile["tmp_name"]);
-      }
-      $gdImage = "animated";
-      break;
-    case IMAGETYPE_AVIF:
-      $gdImage = "avif";
-      break;
-    default:
-      // Deze type foto is niet ondersteund.
-      goToPageWithMessage("index.php", "Unsupported image type. Please upload a JPEG, PNG, GIF, AVIF, or WebP image.", "error");
+if (!file_exists($uploadsFolder . $newImageFile)) {
+  if (!move_uploaded_file($uploadedFile["tmp_name"], $uploadsFolder . $newImageFile)) {
+    goToPageWithMessage("index.php", "Failed to move image to correct place, please try again.", "error");
   }
-  if ($gdImage === "animated" || $gdImage === "avif") {
-    // Gif's en geanimeerde webp's worden niet omgezet. Of als het al een avif image is.
-    move_uploaded_file($uploadedFile["tmp_name"], $uploadsFolder . $imageFilename);
-  }
-  else if ($gdImage === false) {
-    goToPageWithMessage("index.php", "Failed to process the uploaded image.", "error");
-  }
-  if (!imageavif($gdImage, $uploadsFolder . $imageFilename, 80, 6)) {
-    // Er is wat fout gegaan bij het maken van de avif foto.
-    goToPageWithMessage("index.php", "Failed to save image as AVIF.", "error");
-  }
-  // Verwijder het GDImage object.
-  imagedestroy(image: $gdImage);
 }
 
 try {
   require "config.php";
-  $query = "INSERT INTO `uploads` (`uploader`, `title`, `image`) VALUES (:uploader, :title, :image)";
+  $query = "INSERT INTO `uploads` (`uploader`, `title`, `image_hash`) VALUES (:uploader, :title, :image_hash)";
   $stmt = $conn->prepare($query);
   $stmt->bindValue(":uploader", $uploadName);
   $stmt->bindValue(":title", $uploadTitle);
-  $stmt->bindValue(":image", $imageFilename);
+  $stmt->bindValue(":image_hash", $imageHash);
+  $stmt->bindValue(":image_original_name", $uploadedFile["name"]);
   $stmt->execute();
 } catch (PDOException $error) {
   goToPageWithMessage("index.php", "An error occurred trying to add image to the DB. " . $error->getMessage(), "error");
