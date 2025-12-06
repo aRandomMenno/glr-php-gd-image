@@ -103,7 +103,7 @@ if (!file_exists($uploadsFolder . $newImageFile)) {
 
 // Maak een thumbnail aan. (minder initieel laden)
 try {
-  createThumbnail($uploadsFolder . $newImageFile, $thumbnailsFolder . $imageHash . ".avif", 240);
+  createThumbnail($uploadsFolder . $newImageFile, $thumbnailsFolder . $imageHash . ".avif", 500);
 } catch (Exception $error) {
   goToPageWithMessage("index.php", $error->getMessage(), "error");
 }

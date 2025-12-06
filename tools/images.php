@@ -45,8 +45,9 @@ function createThumbnail($source, $destination, $desiredWidth): void {
   $virtual_image = imagecreatetruecolor($desiredWidth, $desiredHeight);
   imagecopyresampled($virtual_image, $img, 0, 0, 0, 0, $desiredWidth, $desiredHeight, $width, $height);
 
-  if (!imageavif($img, $destination, 30, 3)) {
+  if (!imageavif($virtual_image, $destination, 30, 3)) {
     throw new Exception("Failed to save thumbnail as AVIF.");
   }
   imagedestroy($img);
+  imagedestroy($virtual_image);
 }
