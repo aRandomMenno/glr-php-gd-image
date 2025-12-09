@@ -1,6 +1,6 @@
 <?php
 
-// Function to detect if the webp is animated (copied from the internet)
+// Functie om te controleren of een webp afbeelding geanimeerd is.
 function isWebpAnimated($fn): bool {
   $result = false;
   $fh = fopen($fn, "rb");
@@ -35,15 +35,69 @@ function createThumbnail($source, $destination, $desiredWidth): void {
     default:
       throw new Exception("Unsupported image type for thumbnail creation. (should've already been caught earlier)");
   }
+  if (!$img) throw new Exception("Failed to create image resource for thumbnail.");
   $width = imagesx($img);
   $height = imagesy($img);
   $desiredHeight = floor($height * ($desiredWidth / $width));
-  $virtual_image = imagecreatetruecolor($desiredWidth, $desiredHeight);
-  imagecopyresampled($virtual_image, $img, 0, 0, 0, 0, $desiredWidth, $desiredHeight, $width, $height);
+  $virtualImage = imagecreatetruecolor($desiredWidth, $desiredHeight);
+  imagealphablending($virtualImage, false);
+  imagesavealpha($virtualImage, true);
+  imagecopyresampled($virtualImage, $img, 0, 0, 0, 0, $desiredWidth, $desiredHeight, $width, $height);
+  $img = $virtualImage;
 
-  if (!imageavif($virtual_image, $destination, 40, 2)) {
-    throw new Exception("Failed to save thumbnail as AVIF.");
+  if (!imageavif($img, $destination, 40, 2)) throw new Exception("Failed to save thumbnail as AVIF.");
+}
+
+function createWatermarkedImage($source, $destination): void {
+  $type = exif_imagetype($source);
+  switch ($type) {
+    case IMAGETYPE_JPEG:
+      $img = imagecreatefromjpeg($source);
+      break;
+    case IMAGETYPE_PNG:
+      $img = imagecreatefrompng($source);
+      break;
+    case IMAGETYPE_WEBP:
+      $img = imagecreatefromwebp($source);
+      break;
+    case IMAGETYPE_AVIF:
+      $img = imagecreatefromavif($source);
+      break;
+    case IMAGETYPE_GIF:
+      $img = imagecreatefromgif($source);
+      break;
+    default:
+      throw new Exception("Unsupported image type for watermark creation.");
   }
-  imagedestroy($img);
-  imagedestroy($virtual_image);
+
+  if (!$img) throw new Exception("Failed to create image resource from source.");
+
+  imagesavealpha($img, true);
+
+  $watermarkPath = __DIR__ . '/../watermark.png';
+  if (!file_exists($watermarkPath)) throw new Exception("Watermark file not found.");
+
+  $watermark = imagecreatefrompng($watermarkPath);
+  if (!$watermark) throw new Exception("Failed to create watermark image resource.");
+  
+  $imgWidth = imagesx($img);
+  $imgHeight = imagesy($img);
+  $watermarkWidth = intval(imagesx($img) / 20);
+  if ($watermarkWidth < 1) $watermarkWidth = 1;
+
+  $resizedWatermark = imagecreatetruecolor($watermarkWidth, $watermarkWidth);
+  imagealphablending($resizedWatermark, false);
+  imagesavealpha($resizedWatermark, true);
+  imagecopyresampled($resizedWatermark, $watermark, 0, 0, 0, 0, $watermarkWidth, $watermarkWidth, imagesx($watermark), imagesy($watermark));
+  $watermark = $resizedWatermark;
+
+  // Positie bepalen (rechtsonder met wat marge)
+  $margin = 10;
+  $dstX = $imgWidth - $watermarkWidth - $margin;
+  $dstY = $imgHeight - $watermarkWidth - $margin;
+  if ($dstX < 0) $dstX = 0;
+  if ($dstY < 0) $dstY = 0;
+
+  imagecopy($img, $watermark, $dstX, $dstY, 0, 0, $watermarkWidth, $watermarkWidth);
+  if (!imageavif($img, $destination, 80, 4)) throw new Exception("Failed to save watermarked image.");
 }

@@ -1,6 +1,6 @@
 <?php
 
-// Bestanden met functies voor error redirects en foto bewerkingen.
+// De benodigde bestanden toevoegen.
 require_once "config.php";
 require_once "tools/goto.php";
 require_once "tools/images.php";
@@ -8,7 +8,7 @@ require_once "tools/cleanup.php";
 
 session_start();
 
-// Zorg dat de upload en thumbnail mappen bestaan.
+// Zorg dat de upload, thumbnail en watermerk mappen bestaan.
 $uploadsFolder = __DIR__ . "/.uploads/";
 if (!is_dir($uploadsFolder))
   mkdir($uploadsFolder, 0755, true);
@@ -16,6 +16,11 @@ if (!is_dir($uploadsFolder))
 $thumbnailsFolder = __DIR__ . "/.thumbnails/";
 if (!is_dir($thumbnailsFolder))
   mkdir($thumbnailsFolder, 0755, true);
+
+$watermarkFolder = __DIR__ . "/.watermarks/";
+if (!is_dir($watermarkFolder))
+  mkdir($watermarkFolder, 0755, true);
+
 /* 
 var_dump($uploadedFile);
 exit();
@@ -119,6 +124,14 @@ try {
   goToPageWithMessage("index.php", $error->getMessage(), "error");
 }
 
+// Afbeelding maken met watermark. (optioneel en dat gaat (nog) niet met GIF's)
+$message = "";
+try {
+  if ($imageExtension !== ".gif") createWatermarkedImage($uploadsFolder . $newImageFile, $watermarkFolder . $imageHash . ".avif");
+} catch (Exception $error) {
+  $message = $error->getMessage();
+}
+
 // Sla op in de database.
 try {
   $query = "INSERT INTO `uploads` (`uploader`, `title`, `image`) VALUES (:uploader, :title, :image)";
@@ -131,5 +144,7 @@ try {
   cleanUpAfterError($newImageFile, $imageHash, $conn);
   goToPageWithMessage("index.php", "An error occurred trying to add image to the DB. " . $error->getMessage(), "error");
 }
+
 // Als het goed is, is alles goed gegaan als we hier zijn.
+if ($message !== "") goToPageWithMessage("index.php", "Image uploaded successfully, but: " . $message, "warning");
 goToPageWithMessage("index.php", "Successfully added your image to the database.");
